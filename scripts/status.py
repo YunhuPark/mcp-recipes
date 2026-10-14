@@ -36,7 +36,12 @@ def read(path: Path) -> str:
 
 def parse_date(s: str) -> date | None:
     m = re.search(r"(\d{4})-(\d{2})-(\d{2})", s)
-    return date(int(m[1]), int(m[2]), int(m[3])) if m else None
+    if not m:
+        return None
+    try:
+        return date(int(m[1]), int(m[2]), int(m[3]))
+    except ValueError:
+        return None
 
 
 def fmt(d: date) -> str:
