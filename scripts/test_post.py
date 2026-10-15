@@ -330,6 +330,12 @@ class PostTests(unittest.TestCase):
         self.assertEqual((code, t.calls), (1, []))
         self.assertIn("이메일", out)
 
+    def test_the_real_check_refuses_a_reviewed_post_without_an_evidence_table(self):
+        t = FakeTransport([])
+        code, out = self.run_main(["D02", "--publish"], t, check=post.run_site_check)
+        self.assertEqual((code, t.calls), (1, []))
+        self.assertIn("근거표", out)
+
     # 20
     def test_manual_publish_needs_a_human_yes(self):
         for answer in ("", "y", "no", "Yes "):

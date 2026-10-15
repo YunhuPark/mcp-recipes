@@ -30,6 +30,19 @@
 - [ ] PR #12 이후 `--threads` 차단이 main에 그대로 있는가 (`git grep "args.threads" main.py`)
 - [ ] 오타 없음
 
+## 근거표 (본문의 사실 주장마다 한 행. 요청이나 다짐 문장은 사실 주장이 아니라 제외)
+- 대조일: 2026-10-15 / 본문 해시: 8c46a2aef934
+- 대조 범위: 2026-10-15, 알고 저장소는 origin/main을 직접 확인
+| 본문 주장 | 근거 파일 | 근거 인용 | 결과 |
+|---|---|---|---|
+| 알고는 사용자가 만든 카드뉴스 자동화 프로그램이다 | `validation-log.md` | 알고(algo-pipeline)에서 | 일치 |
+| 위 저장소는 사용자 본인 계정의 것이다 | 외부: 알고 저장소의 git remote | 2026-10-15 확인, origin 소유자가 이 저장소의 소유자와 같은 계정 | 일치 |
+| 알고에 Threads 게시 코드가 이미 있었다 | 외부: 알고 저장소 origin/main의 src/agents/threads_publisher.py | 2026-10-15 확인, 파일이 있고 THREADS_API_BASE가 graph.threads.net을 가리킴 | 일치 |
+| 옵션 하나가 승인 없이 게시 코드까지 이어졌다 | 외부: 알고 저장소 커밋 ba1aac6의 메시지 | 2026-10-15 확인, called run_pipeline(publish_threads=True, auto=True) with no human approval | 일치 |
+| 시도 기록과 승인이 있는 안전한 경로에 연결돼 있지 않았다 | 외부: 알고 저장소 origin/main의 main.py | 2026-10-15 확인, Threads publisher는 Queue V2 durable attempt와 연결되어 있지 않다 | 일치 |
+| 그 옵션은 모든 모드에서 막아뒀다 | 외부: 알고 저장소 origin/main의 main.py | 2026-10-15 확인, main()의 첫 분기 if args.threads: 에서 sys.exit(2) | 일치 |
+| 실제로 게시된 적이 있는지는 확인하지 못했다 | `validation-log.md` | 옵션이 승인 없이 Threads 게시 코드로 이어지는 경로를 발견해 차단했습니다 | 미확인 (게시 이력은 조회하지 않음) |
+
 ## 게시 후 기록
 | 조회 | 저장 | 공유 | 요청한 사람(서로 다른) | 확인일 |
 |---|---|---|---|---|

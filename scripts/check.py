@@ -7,6 +7,8 @@
   3. 글 점검: posts/daily 글의 500자 제한, 글자 수 표기, 브랜드명 철자
   4. 상태 일치: posts/schedule.md 의 상태와 각 글 파일의 상태
   5. 아직 푸시하지 않은 커밋: 작성자 이메일이 noreply 인지, 메시지에 비밀값이 없는지
+  6. 근거표: 검수완료/게시됨 글은 `## 근거표`가 있어야 한다. 각 행의 인용이 근거 파일에 실제로 있는지,
+     본문이 대조한 뒤에 바뀌지 않았는지(해시)를 확인한다. 근거표가 **맞는지**는 사람과 대조 작업이 판단한다.
 
 한계
   - 패턴으로 찾기 때문에 패턴에 없는 형태의 민감 정보는 놓친다. 올리기 전에 직접 훑어볼 것.
@@ -16,11 +18,14 @@
   python scripts/check.py              # 파일 + 푸시 전 커밋 점검
   python scripts/check.py --pre-push   # 푸시 훅에서 호출 (동일, 실패 시 푸시 중단)
   python scripts/check.py --root DIR   # 다른 폴더를 점검 (테스트용)
+  python scripts/check.py --stamp D03  # 근거표 대조를 끝낸 뒤, 그 시점의 본문 해시와 날짜를 기록
 종료 코드: 0 = 통과(경고만 있어도 0), 1 = 오류 있음
 """
 from __future__ import annotations
 
 import argparse
+import datetime
+import hashlib
 import re
 import subprocess
 import sys
@@ -33,6 +38,8 @@ BLOCKLIST_FILE = ".check-blocklist.local"
 ALLOWED_EMAIL_DOMAINS = {"users.noreply.github.com", "example.com", "example.org"}
 # 도메인 전체가 아니라 정확한 주소만 허용한다 (커밋 메시지의 공동 작성자 표기용 공개 noreply 주소)
 ALLOWED_EMAILS = {"noreply@anthropic.com"}
+EVIDENCE_STATUSES = {"검수완료", "게시됨"}  # 이 상태의 글은 근거표가 필요하다
+EVIDENCE_RESULTS = ("일치", "표현 수정", "미확인")
 SKIP_DIRS = {".git"}
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")
@@ -137,6 +144,90 @@ def check_brand_spelling(label: str, blocks: list[str]) -> None:
             err(f"{label}: 브랜드명 오타('모닝블름')가 올바른 표기('모닝블룸') 없이 단독으로 있습니다")
 
 
+def norm_ws(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def body_hash(block: str) -> str:
+    return hashlib.sha256(norm_ws(block.replace("\r", "")).encode("utf-8")).hexdigest()[:12]
+
+
+def evidence_section(text: str) -> str | None:
+    m = re.search(r"^## 근거표[^\n]*\n(.*?)(?=^## |\Z)", text.replace("\r", ""), re.S | re.M)
+    return m.group(1) if m else None
+
+
+def check_evidence(label: str, text: str, block: str, root: Path) -> None:
+    """검수완료/게시됨 글의 근거표를 점검한다. 내용이 사실인지는 판단하지 못한다."""
+    section = evidence_section(text)
+    if section is None:
+        err(f"{label}: '## 근거표'가 없습니다 (본문의 사실 주장마다 근거 파일과 인용, 대조 결과가 필요)")
+        return
+    stamp = re.search(r"대조일:\s*(\d{4}-\d{2}-\d{2}).*?본문 해시:\s*([0-9a-f]{12})", section)
+    if not stamp:
+        err(f"{label}: 근거표에 '- 대조일: YYYY-MM-DD / 본문 해시: …' 줄이 없습니다 (`check.py --stamp`로 기록)")
+    elif stamp.group(2) != body_hash(block):
+        err(f"{label}: 본문이 근거표를 대조한 뒤에 바뀌었습니다. 다시 대조하고 `check.py --stamp`로 기록하세요")
+    rows = []
+    for line in section.splitlines():
+        line = line.strip()
+        if not line.startswith("|") or re.match(r"^\|[\s:|-]+\|?$", line):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if cells[:1] == ["본문 주장"]:
+            continue
+        rows.append(cells)
+    if not rows:
+        err(f"{label}: 근거표에 행이 없습니다")
+    for i, cells in enumerate(rows, 1):
+        if len(cells) != 4 or not all(cells):
+            err(f"{label}: 근거표 {i}번째 행은 '본문 주장 | 근거 파일 | 근거 인용 | 결과' 네 칸이 모두 채워져야 합니다")
+            continue
+        _, src, quote, result = cells
+        if not result.startswith(EVIDENCE_RESULTS):
+            err(f"{label}: 근거표 {i}번째 행의 결과는 {'/'.join(EVIDENCE_RESULTS)} 중 하나로 시작해야 합니다")
+        src = src.strip("`")
+        if src.startswith("외부:"):
+            if not re.search(r"\d{4}-\d{2}-\d{2}", quote):
+                err(f"{label}: 근거표 {i}번째 행은 외부 근거를 직접 확인한 날짜(YYYY-MM-DD)를 인용 칸에 적어야 합니다")
+            continue
+        path = (root / src).resolve()
+        if root.resolve() not in path.parents or not path.is_file():
+            err(f"{label}: 근거표 {i}번째 행의 근거 파일 '{src}'을 저장소에서 찾지 못했습니다")
+            continue
+        wanted = norm_ws(quote.strip("`\"' "))
+        if not wanted or wanted not in norm_ws(read_text(path) or ""):
+            err(f"{label}: 근거표 {i}번째 행의 인용이 '{src}'에 그대로 있지 않습니다 (파일이 바뀌었거나 인용이 틀림)")
+
+
+def file_status(text: str) -> str:
+    m = re.search(r"-\s*상태:\s*\*\*([^*]+)\*\*", text)
+    return m.group(1).strip().split()[0] if m else ""
+
+
+def stamp_post(root: Path, post_id: str) -> int:
+    matches = sorted((root / "posts" / "daily").glob(f"{post_id}-*.md"))
+    if len(matches) != 1:
+        print(f"{post_id} 글 파일을 하나 찾지 못했습니다")
+        return 1
+    path = matches[0]
+    raw = path.read_bytes().decode("utf-8")
+    nl = "\r\n" if "\r\n" in raw else "\n"
+    text = raw.replace("\r\n", "\n")
+    block = first_code_block(text)
+    if block is None or not re.search(r"^## 근거표[^\n]*\n", text, re.M):
+        print(f"{path.name}: 본문 코드 블록이나 '## 근거표'가 없습니다")
+        return 1
+    line = f"- 대조일: {datetime.date.today().isoformat()} / 본문 해시: {body_hash(block)}"
+    if re.search(r"^- 대조일:[^\n]*$", text, re.M):
+        text = re.sub(r"^- 대조일:[^\n]*$", lambda m: line, text, count=1, flags=re.M)
+    else:
+        text = re.sub(r"(^## 근거표[^\n]*\n)", lambda m: m.group(1) + line + "\n", text, count=1, flags=re.M)
+    path.write_bytes(text.replace("\n", nl).encode("utf-8"))
+    print(f"{path.name}: {line}")
+    return 0
+
+
 def check_posts(root: Path) -> None:
     daily = root / "posts" / "daily"
     if daily.exists():
@@ -155,6 +246,8 @@ def check_posts(root: Path) -> None:
             if m and int(m.group(1)) != n:
                 warn(f"{label}: 표기된 글자 수({m.group(1)}자)와 실제({n}자)가 다릅니다")
             check_brand_spelling(label, [block])
+            if file_status(text) in EVIDENCE_STATUSES:
+                check_evidence(label, text, block, root)
     for path in sorted((root / "posts").glob("0*.md")) if (root / "posts").exists() else []:
         text = read_text(path) or ""
         label = f"posts/{path.name}"
@@ -233,9 +326,12 @@ def main() -> int:
     ap.add_argument("--root", default=None, help="점검할 폴더 (기본: 이 스크립트의 저장소 루트)")
     ap.add_argument("--pre-push", action="store_true", help="푸시 훅에서 호출")
     ap.add_argument("--no-commits", action="store_true", help="푸시 전 커밋 점검을 건너뜀")
+    ap.add_argument("--stamp", metavar="ID", help="근거표 대조를 끝낸 글(예: D03)의 날짜와 본문 해시를 기록")
     args = ap.parse_args()
 
     root = Path(args.root).resolve() if args.root else Path(__file__).resolve().parent.parent
+    if args.stamp:
+        return stamp_post(root, args.stamp)
     blocklist = load_blocklist(root)
 
     check_files(root, blocklist)
