@@ -1,0 +1,11 @@
+{
+  "taken": "2026-10-18",
+  "purpose": "양성 대조군: 하루 단위로 바뀌는 공개 페이지(위키백과 한국어 대문). 내일 이후 다시 읽으면 변화가 잡혀야 한다. 기준선이 같은 줄 지문 방식(fingerprint.js)을 쓴다",
+  "method": "main 요소(없으면 body)의 innerText를 줄 단위로 나눠 공백 정리, 길이 2 이상만, SHA-256 앞 8자리, 중복 제거 후 최초 등장 순서",
+  "pages": {
+    "ko_wiki_main": {
+      "url": "https://ko.wikipedia.org/wiki/위키백과:대문",
+      "fp": "ade1526c,3d53da77,36c416ea,576be319,83f0859a,3a66879f,11b3e1e5,6ce88fe8,1e3038a3,9549139a,f04b9c71,c9af6788,694d15d0,43b5b5fb,5eb79cb3,95aac161,0849edd5,1be07698,de99eb9e,875f49fe,498906ff,d7b9935e,a7f82310,3ba434f1,ebad38b4,11c80d44,211d3a4f,90f8d905,8b882547,db450932,bd11ee01,64115e24,4cd9ceba,dba5616a,1c704311,5e8959d1,ee96c820,22596249,29c4ccf7,72359fc4,2ceef505,94ea335d,1549ad6f,0d451e6e,dbe19891,8ae8b34b,8bc78f2a,ab1366a6,1360340d,067cc8d0,845b67a2,c34b0aff,47e9f460,cb2f6a61,7008f26b,6a7f9afa,0e00fffe,7a9f9ab0,6e56ab23,2a4955e6,b0170dfb,69fc2f43,db52216b,fc97c2ee,151c53a0,ee09ec08,6624e1bd,e5f8e6dd,c1b9f8f2,fe4a7e73,447ad807,0424ec4d,b368d1fb,8a691f01,a49415d3,120d0404,a22b67e4,23e6aad0,877bfa80,7f242626,0ea3f12f,9fe3dd26,5d40b575,0c245be0,bab25467,a621bd9a,bbad62e0,f28471cb,61f16506,f2c926ef,d9c6a957,5f6a1ce4"
+    }
+  }
+}
