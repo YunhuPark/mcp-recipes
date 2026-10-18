@@ -7,7 +7,9 @@
   3. 글 점검: posts/daily 글의 500자 제한, 글자 수 표기, 브랜드명 철자
   4. 상태 일치: posts/schedule.md 의 상태와 각 글 파일의 상태
   5. 아직 푸시하지 않은 커밋: 작성자 이메일이 noreply 인지, 메시지에 비밀값이 없는지
-  6. 근거표: 검수완료/게시됨 글은 `## 근거표`가 있어야 한다. 각 행의 인용이 근거 파일에 실제로 있는지,
+  6. 지시형 문장 경고: 아직 올리지 않은 글 본문에 "~하세요", "~해주세요" 같은 독자 지시가 있으면 경고한다
+     (이 연재는 해본 기록이라 독자에게 지시하지 않는다. 댓글 요청인 "알려주세요"는 허용). 경고만 하고 실패시키지 않는다.
+  7. 근거표: 검수완료/게시됨 글은 `## 근거표`가 있어야 한다. 각 행의 인용이 근거 파일에 실제로 있는지,
      본문이 대조한 뒤에 바뀌지 않았는지(해시)를 확인한다. 근거표가 **맞는지**는 사람과 대조 작업이 판단한다.
 
 한계
@@ -40,6 +42,8 @@ ALLOWED_EMAIL_DOMAINS = {"users.noreply.github.com", "example.com", "example.org
 ALLOWED_EMAILS = {"noreply@anthropic.com"}
 EVIDENCE_STATUSES = {"검수완료", "게시됨"}  # 이 상태의 글은 근거표가 필요하다
 EVIDENCE_RESULTS = ("일치", "표현 수정", "미확인")
+IMPERATIVE_RE = re.compile(r"세요|십시오")  # 독자에게 하라고 지시하는 어미
+IMPERATIVE_OK_RE = re.compile(r"알려\s?주세요")  # 댓글 요청은 지시가 아니라 요청이다
 SKIP_DIRS = {".git"}
 
 EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})")
@@ -200,6 +204,12 @@ def check_evidence(label: str, text: str, block: str, root: Path) -> None:
             err(f"{label}: 근거표 {i}번째 행의 인용이 '{src}'에 그대로 있지 않습니다 (파일이 바뀌었거나 인용이 틀림)")
 
 
+def check_imperatives(label: str, block: str) -> None:
+    for line in block.splitlines():
+        if IMPERATIVE_RE.search(line) and not IMPERATIVE_OK_RE.search(line):
+            warn(f"{label}: 독자에게 지시하는 문장으로 보입니다 ('{line.strip()[:30]}'). 이 연재는 해본 기록이라 지시형을 피합니다")
+
+
 def file_status(text: str) -> str:
     m = re.search(r"-\s*상태:\s*\*\*([^*]+)\*\*", text)
     return m.group(1).strip().split()[0] if m else ""
@@ -246,6 +256,8 @@ def check_posts(root: Path) -> None:
             if m and int(m.group(1)) != n:
                 warn(f"{label}: 표기된 글자 수({m.group(1)}자)와 실제({n}자)가 다릅니다")
             check_brand_spelling(label, [block])
+            if file_status(text) != "게시됨":  # 이미 올라간 글에는 경고하지 않는다
+                check_imperatives(label, block)
             if file_status(text) in EVIDENCE_STATUSES:
                 check_evidence(label, text, block, root)
     for path in sorted((root / "posts").glob("0*.md")) if (root / "posts").exists() else []:
