@@ -6,6 +6,7 @@
   python scripts/post.py D02                 # 미리보기만 (네트워크 호출 없음)
   python scripts/post.py D02 --publish       # 실제 발행 (사람이 'yes'를 입력해 확인)
   python scripts/post.py --status            # 지금까지의 발행 기록
+  python scripts/post.py --check-token       # 토큰이 유효한지 읽기 전용으로 확인 (아무것도 게시하지 않음)
   python scripts/post.py D02 --retry --publish    # 안전하게 실패한 글을 다시 시도
   python scripts/post.py D02 --resolve published|not_published   # 불확실한 시도를 사람이 확인한 뒤 해소
   python scripts/post.py --scheduled --publish    # 예약 실행용 (수동 발행 3회 성공 뒤에만 열림)
@@ -43,7 +44,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from threads_text import LIMIT, threads_len  # noqa: E402
 
-API_BASE = "https://graph.threads.net/v1.0"
+API_BASE = "https://graph.threads.com/v1.0"  # 공식 문서(2026-10-20 확인)의 도메인. 예전 문서는 graph.threads.net
 TOKEN_ENV, USER_ENV, LIVE_ENV, EXPIRES_ENV = (
     "THREADS_ACCESS_TOKEN", "THREADS_USER_ID", "THREADS_LIVE", "THREADS_TOKEN_EXPIRES")
 STATE_FILE = ".post-state.local.json"
@@ -308,6 +309,30 @@ def cmd_status(state: State) -> int:
     return 0
 
 
+def cmd_check_token(transport, now: datetime) -> int:
+    """읽기 전용 호출 하나(GET /me)로 토큰이 유효한지, THREADS_USER_ID 와 같은 계정인지 확인한다."""
+    token, user_id = os.environ.get(TOKEN_ENV, ""), os.environ.get(USER_ENV, "")
+    if not token or not user_id:
+        print(f"{TOKEN_ENV}, {USER_ENV} 가 필요합니다. 다른 토큰으로 대체하지 않습니다.")
+        return 1
+    for w in token_warnings(now):
+        print("[경고] 토큰이 만료되었습니다" if w == "__EXPIRED__" else f"[경고] {w}")
+    transport = transport or RealTransport()
+    try:
+        status, body = transport.request("GET", f"{API_BASE}/me?fields=id&access_token={urllib.parse.quote(token)}", None)
+    except NetworkError as e:
+        print(f"네트워크 오류({e}). 토큰 상태를 확인하지 못했습니다")
+        return 1
+    if not (200 <= status < 300) or not isinstance(body, dict) or not body.get("id"):
+        print(f"토큰을 확인하지 못했습니다 ({_fail_text(status, body, token)})")
+        return 1
+    if str(body["id"]) != user_id:
+        print(f"토큰의 계정과 {USER_ENV} 가 다릅니다. 발행하지 말고 두 값을 다시 확인하세요")
+        return 1
+    print(f"토큰이 유효하고 {USER_ENV} 와 같은 계정입니다 (읽기 전용 확인, 게시하지 않았습니다)")
+    return 0
+
+
 def cmd_resolve(state: State, root: Path, post_id: str, outcome: str, now: datetime) -> int:
     rec = state.get(post_id)
     if not rec or rec.get("state") != "UNCERTAIN":
@@ -344,6 +369,7 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
     ap.add_argument("post_id", nargs="?", help="예: D02")
     ap.add_argument("--publish", action="store_true", help="실제 발행 (THREADS_LIVE=yes 도 필요)")
     ap.add_argument("--status", action="store_true", help="발행 기록 보기")
+    ap.add_argument("--check-token", action="store_true", help="토큰이 유효한지 읽기 전용으로 확인")
     ap.add_argument("--retry", action="store_true", help="게시되지 않은 채 실패한 글을 다시 시도")
     ap.add_argument("--resolve", choices=["published", "not_published"], help="불확실한 시도를 사람이 확인한 뒤 해소")
     ap.add_argument("--scheduled", action="store_true", help="예약 실행(오늘 날짜의 검수완료 글을 고름)")
@@ -359,6 +385,8 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
 
     if args.status:
         return cmd_status(state)
+    if args.check_token:
+        return cmd_check_token(transport, now)
     if args.resolve:
         if not args.post_id:
             print("--resolve 에는 글 번호가 필요합니다 (예: D02)")
