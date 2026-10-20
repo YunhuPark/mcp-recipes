@@ -96,7 +96,7 @@ def count_backlog(text: str) -> int:
     m = re.search(r"### 남은 단독 글감.*?\n(.*?)(?=\n### |\n## |\Z)", text, re.S)
     if not m:
         return 0
-    return len(re.findall(r"^\|\s*[①-⑳㉑-㉟]\s*\|", m[1], re.M))
+    return len(re.findall(r"^\|\s*[①-⑳㉑-㉟㊱-㊿]\s*\|", m[1], re.M))  # 원문자 번호 ①~㊿
 
 
 def parse_metrics(text: str) -> list[str] | None:
@@ -106,8 +106,10 @@ def parse_metrics(text: str) -> list[str] | None:
         return None
     for line in m[1].splitlines():
         s = line.strip()
-        if s.startswith("|") and not s.startswith("|---") and "조회" not in s:
+        if s.startswith("|") and not s.startswith("|---"):
             cells = [c.strip() for c in s.strip("|").split("|")]
+            if cells[0] == "조회":  # 머리글 줄만 건너뛴다 (확인일 칸에 '조회'라는 글자가 있어도 데이터 줄로 읽는다)
+                continue
             return cells + [""] * (5 - len(cells))
     return None
 
