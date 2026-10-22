@@ -47,6 +47,7 @@ from threads_text import LIMIT, threads_len  # noqa: E402
 API_BASE = "https://graph.threads.com/v1.0"  # 공식 문서(2026-10-20 확인)의 도메인. 예전 문서는 graph.threads.net
 TOKEN_ENV, USER_ENV, LIVE_ENV, EXPIRES_ENV = (
     "THREADS_ACCESS_TOKEN", "THREADS_USER_ID", "THREADS_LIVE", "THREADS_TOKEN_EXPIRES")
+TOPIC_ENV = "THREADS_TOPIC_TAG"  # 기본 주제 태그(비밀 아님). --topic 이 우선한다
 STATE_FILE = ".post-state.local.json"
 STALE_MINUTES = 10
 GATE_MANUAL_SUCCESSES = 3
@@ -169,6 +170,15 @@ class State:
                    if r.get("state") == state and (mode is None or r.get("mode") == mode))
 
 
+def validate_topic(tag: str) -> str | None:
+    """주제 태그 규칙(공식 문서): 1~50자, 마침표(.)와 앰퍼샌드(&)는 쓸 수 없다. 문제가 있으면 이유를, 없으면 None."""
+    if not 1 <= len(tag) <= 50:
+        return f"주제 태그는 1~50자여야 합니다 (현재 {len(tag)}자)"
+    if "." in tag or "&" in tag:
+        return "주제 태그에는 마침표(.)와 앰퍼샌드(&)를 쓸 수 없습니다"
+    return None
+
+
 # ---------------------------------------------------------------- 자격 조건 검사
 def run_site_check(root: Path) -> tuple[bool, str]:
     script = Path(__file__).resolve().parent / "check.py"
@@ -226,7 +236,8 @@ def _fail_text(status, body, token) -> str:
 
 
 def publish_post(root: Path, post: Post, state: State, transport, token: str, user_id: str, *,
-                 mode: str, wait_seconds: float, now: datetime, sleep=time.sleep) -> tuple[str, str]:
+                 mode: str, wait_seconds: float, now: datetime, sleep=time.sleep,
+                 topic: str | None = None) -> tuple[str, str]:
     """반환: (결과 상태, 설명). 어떤 경우에도 자동으로 다시 시도하지 않는다."""
     attempt = {
         "attempt_id": uuid.uuid4().hex, "mode": mode, "started": now.isoformat(timespec="seconds"),
@@ -237,8 +248,10 @@ def publish_post(root: Path, post: Post, state: State, transport, token: str, us
 
     # 1단계: 컨테이너 만들기 (여기서 실패하면 게시된 것이 없다)
     try:
-        status, body = transport.request("POST", f"{API_BASE}/{user_id}/threads",
-                                         {"media_type": "TEXT", "text": post.body, "access_token": token})
+        container = {"media_type": "TEXT", "text": post.body, "access_token": token}
+        if topic:
+            container["topic_tag"] = topic
+        status, body = transport.request("POST", f"{API_BASE}/{user_id}/threads", container)
     except NetworkError as e:
         state.set(post.id, state="FAILED", reason=f"컨테이너 생성 중 네트워크 오류({e}). 게시되지 않음")
         return "FAILED", "컨테이너 생성 중 네트워크 오류. 게시되지 않았습니다"
@@ -373,6 +386,7 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
     ap.add_argument("--retry", action="store_true", help="게시되지 않은 채 실패한 글을 다시 시도")
     ap.add_argument("--resolve", choices=["published", "not_published"], help="불확실한 시도를 사람이 확인한 뒤 해소")
     ap.add_argument("--scheduled", action="store_true", help="예약 실행(오늘 날짜의 검수완료 글을 고름)")
+    ap.add_argument("--topic", default=None, help=f"주제 태그(예: 'AI Threads'). 없으면 환경 변수 {TOPIC_ENV}, 그것도 없으면 태그 없이 올림")
     ap.add_argument("--allow-extra", action="store_true", help="하루 1개 제한을 풀기")
     ap.add_argument("--wait", type=float, default=DEFAULT_WAIT_SECONDS, help="컨테이너 생성 뒤 대기 초 (기본 30)")
     ap.add_argument("--root", default=None)
@@ -416,8 +430,12 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
     print(f"== {post.id} ({post.path.name}) ==")
     print(post.body)
     print(f"-- Threads 기준 길이 {threads_len(post.body)} / {LIMIT} --")
+    topic = (args.topic if args.topic is not None else os.environ.get(TOPIC_ENV, "")).strip()
+    print(f"-- 주제 태그: {topic or '(없음)'} --")
 
     problems = eligibility(post, state, root, now, retry=args.retry, allow_extra=args.allow_extra, check=check)
+    if topic and validate_topic(topic):
+        problems.append(validate_topic(topic))
     for w in token_warnings(now):
         if w == "__EXPIRED__":
             problems.append(f"토큰이 만료되었습니다 ({EXPIRES_ENV})")
@@ -455,7 +473,7 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
 
     transport = transport or RealTransport()
     result, msg = publish_post(root, post, state, transport, token, user_id, mode=mode,
-                               wait_seconds=args.wait, now=now, sleep=sleep)
+                               wait_seconds=args.wait, now=now, sleep=sleep, topic=topic or None)
     print(f"\n[{result}] {msg}")
     if result == "PUBLISHED":
         try:
