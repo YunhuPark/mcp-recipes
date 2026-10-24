@@ -107,7 +107,26 @@ python scripts/insights.py                  # 게시한 글의 조회와 반응�
 | 4 | `insights.py`로 조회 수를 읽어 `게시 후 기록`에 반영 | Claude |
 | 5 | 스케줄러 등록 (아래) | 사용자가 승인하고 등록 |
 
-## 스케줄러 등록 (3번 성공한 뒤에만, 아직 하지 않음)
+## 스케줄러 없이 하루 한 번 직접 올리기 (가장 단순한 방법)
+
+작업 스케줄러가 번거로우면(창이 뜨거나, 껐다 켤 때 겹치는 문제) **등록하지 않고** 노트북을 켠 뒤 한 번만 실행해도 된다. 수동 3번 성공을 채웠으므로 예약 모드(`--scheduled`)가 열려 있고, 이 모드는 확인 입력 없이 **오늘 날짜의 `검수완료` 글 하나**를 올린다.
+
+- 더블클릭: `scripts\post_today.cmd` (실행 뒤 결과와 발행 기록을 보여 주고 멈춘다)
+- 또는 터미널: `python scripts/post.py --scheduled --publish --topic "AI Threads"` (`THREADS_LIVE=yes` 필요)
+- **두 번 실행해도 두 번 올라가지 않는다.** 하루 1개 제한과 같은 글 재게시 금지가 기록 파일 기준으로 막고, 오늘 이미 올렸다면 "이미 게시했다"며 멈춘다.
+- 그날 놓치면 그날 글은 올라가지 않는다(다음 날은 그날 글만 올린다). 놓친 글은 `python scripts/post.py D12 --publish --topic "AI Threads"`처럼 글 번호를 주고 올릴 수 있다.
+
+## 스케줄러 등록 (선택. 수동 3번 성공 완료: D07, D08, D09. 등록은 사용자가 직접)
+
+**등록 스크립트: `scripts/register_task.ps1`** (사용자가 직접 실행한다. 먼저 `-DryRun`으로 무엇이 등록되는지 본다.)
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scriptsegister_task.ps1 -DryRun        # 보기만
+powershell -ExecutionPolicy Bypass -File scriptsegister_task.ps1 -Time 12:00    # 매일 12:00 등록
+powershell -ExecutionPolicy Bypass -File scriptsegister_task.ps1 -Remove        # 등록 취소
+```
+
+아래는 이 스크립트가 따르는 기준이다.
 
 작업 스케줄러는 PC의 설정을 바꾸는 일이라 Claude가 임의로 등록하지 않는다. 등록할 때의 기준:
 

@@ -7,3 +7,8 @@
 .env
 .env.*
 *.local
+
+# 파이썬 캐시와 예약 실행 로그
+__pycache__/
+*.pyc
+.post-scheduler.log

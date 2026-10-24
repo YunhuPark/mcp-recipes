@@ -4,6 +4,7 @@
 사용:
   python scripts/insights.py            # 표로 보기
   python scripts/insights.py --json     # JSON 으로 보기
+  python scripts/insights.py --write    # 각 글 파일의 '게시 후 기록' 표에 조회를 적고 확인일 칸에 API 값을 남긴다 (커밋은 하지 않는다)
 
 필요: THREADS_ACCESS_TOKEN, THREADS_USER_ID (post.py 와 같은 값). 토큰에 threads_manage_insights 권한이 있어야 한다.
 
@@ -19,6 +20,7 @@ import os
 import re
 import sys
 import urllib.parse
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -81,11 +83,52 @@ def collect(root: Path, transport, token: str) -> list[dict]:
     return sorted(rows, key=lambda r: r["id"])
 
 
-def main(argv=None, *, transport=None, root: Path | None = None) -> int:
+RECORD_RE = re.compile(r"(## 게시 후 기록[^\n]*\n\|[^\n]*\n\|---[^\n]*\n)(\|[^\n]*)\n")
+OLD_NOTE_RE = re.compile(r"\s*/?\s*\d{4}-\d{2}-\d{2} \d{2}:\d{2} 인사이트\(API\):[^/]*$")
+
+
+def update_record(text: str, row: dict, now: datetime) -> tuple[str, bool]:
+    """글 파일의 '게시 후 기록' 한 줄을 갱신한다. 조회 칸은 값이 있으면 덮어쓰고, 요청 칸은 건드리지 않는다.
+    확인일 칸 끝에는 API 값 메모를 붙인다(이전 API 메모는 새 것으로 교체). 요청 여부는 사람이 읽고 정한다."""
+    m = RECORD_RE.search(text)
+    if not m:
+        return text, False
+    cells = [c.strip() for c in m.group(2).strip().strip("|").split("|")]
+    if len(cells) != 5:
+        return text, False
+    show = lambda v: "-" if v is None else str(v)  # noqa: E731
+    if row.get("views") is not None:
+        cells[0] = str(row["views"])
+    note = OLD_NOTE_RE.sub("", cells[4]).strip()
+    api = (f"{now:%Y-%m-%d %H:%M} 인사이트(API): 조회 {show(row.get('views'))}, 좋아요 {show(row.get('likes'))}, "
+           f"답글 {show(row.get('replies'))}, 리포스트 {show(row.get('reposts'))}")
+    cells[4] = (note + " / " if note else "") + api
+    new_row = "| " + " | ".join(cells) + " |"
+    return text.replace(m.group(2), new_row, 1), True
+
+
+def write_records(root: Path, rows: list[dict], now: datetime) -> list[str]:
+    """읽은 값을 각 글 파일에 적는다. 반환: 갱신한 글 번호."""
+    done = []
+    for r in rows:
+        found = sorted((root / "posts" / "daily").glob(f"{r['id']}-*.md"))
+        if len(found) != 1:
+            continue
+        raw = found[0].read_bytes().decode("utf-8")
+        eol = "\r\n" if "\r\n" in raw else "\n"
+        new, ok = update_record(raw.replace("\r\n", "\n"), r, now)
+        if ok:
+            found[0].write_bytes(new.replace("\n", eol).encode("utf-8"))
+            done.append(r["id"])
+    return done
+
+
+def main(argv=None, *, transport=None, root: Path | None = None, now: datetime | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description="게시한 글의 조회와 반응 (읽기 전용)")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--write", action="store_true", help="각 글 파일의 '게시 후 기록'에 조회를 적는다 (커밋은 하지 않음)")
     ap.add_argument("--root", default=None)
     args = ap.parse_args(argv)
     root = Path(root or args.root or Path(__file__).resolve().parent.parent).resolve()
@@ -104,6 +147,10 @@ def main(argv=None, *, transport=None, root: Path | None = None) -> int:
         print(str(e))
         return 1
 
+    if args.write:
+        done = write_records(root, rows, now or datetime.now())
+        print(f"'게시 후 기록'을 갱신한 글: {', '.join(done) if done else '없음'} (커밋은 하지 않았습니다. 요청 칸은 건드리지 않았으니 댓글을 읽고 직접 정하세요)")
+        return 0
     if args.json:
         print(json.dumps(rows, ensure_ascii=False, indent=2))
         return 0
