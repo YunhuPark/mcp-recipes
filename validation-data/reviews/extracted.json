@@ -1,0 +1,202 @@
+[
+ {
+  "n": 1,
+  "category": "품질",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 2,
+  "category": "포장",
+  "sentiment": "부정"
+ },
+ {
+  "n": 3,
+  "category": "응대",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 4,
+  "category": "포장",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 5,
+  "category": "가격",
+  "sentiment": "부정"
+ },
+ {
+  "n": 6,
+  "category": "포장",
+  "sentiment": "부정"
+ },
+ {
+  "n": 7,
+  "category": "가격",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 8,
+  "category": "가격",
+  "sentiment": "부정"
+ },
+ {
+  "n": 9,
+  "category": "응대",
+  "sentiment": "부정"
+ },
+ {
+  "n": 10,
+  "category": "품질",
+  "sentiment": "부정"
+ },
+ {
+  "n": 11,
+  "category": "배송",
+  "sentiment": "부정"
+ },
+ {
+  "n": 12,
+  "category": "가격",
+  "sentiment": "부정"
+ },
+ {
+  "n": 13,
+  "category": "가격",
+  "sentiment": "부정"
+ },
+ {
+  "n": 14,
+  "category": "포장",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 15,
+  "category": "품질",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 16,
+  "category": "응대",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 17,
+  "category": "포장",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 18,
+  "category": "품질",
+  "sentiment": "부정"
+ },
+ {
+  "n": 19,
+  "category": "응대",
+  "sentiment": "부정"
+ },
+ {
+  "n": 20,
+  "category": "품질",
+  "sentiment": "부정"
+ },
+ {
+  "n": 21,
+  "category": "응대",
+  "sentiment": "부정"
+ },
+ {
+  "n": 22,
+  "category": "배송",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 23,
+  "category": "가격",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 24,
+  "category": "배송",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 25,
+  "category": "응대",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 26,
+  "category": "포장",
+  "sentiment": "부정"
+ },
+ {
+  "n": 27,
+  "category": "포장",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 28,
+  "category": "가격",
+  "sentiment": "부정"
+ },
+ {
+  "n": 29,
+  "category": "배송",
+  "sentiment": "부정"
+ },
+ {
+  "n": 30,
+  "category": "품질",
+  "sentiment": "부정"
+ },
+ {
+  "n": 31,
+  "category": "응대",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 32,
+  "category": "품질",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 33,
+  "category": "배송",
+  "sentiment": "부정"
+ },
+ {
+  "n": 34,
+  "category": "품질",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 35,
+  "category": "배송",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 36,
+  "category": "품질",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 37,
+  "category": "가격",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 38,
+  "category": "품질",
+  "sentiment": "부정"
+ },
+ {
+  "n": 39,
+  "category": "응대",
+  "sentiment": "긍정"
+ },
+ {
+  "n": 40,
+  "category": "배송",
+  "sentiment": "부정"
+ }
+]

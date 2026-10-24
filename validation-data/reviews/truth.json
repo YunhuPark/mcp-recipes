@@ -1,0 +1,245 @@
+{
+ "seed": 4027120652,
+ "items": [
+  {
+   "n": 1,
+   "category": "품질",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 2,
+   "category": "포장",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 3,
+   "category": "응대",
+   "sentiment": "긍정",
+   "kind": "negation"
+  },
+  {
+   "n": 4,
+   "category": "포장",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 5,
+   "category": "가격",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 6,
+   "category": "포장",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 7,
+   "category": "가격",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 8,
+   "category": "가격",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 9,
+   "category": "응대",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 10,
+   "category": "품질",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 11,
+   "category": "배송",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 12,
+   "category": "가격",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 13,
+   "category": "가격",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 14,
+   "category": "포장",
+   "sentiment": "긍정",
+   "kind": "mixed"
+  },
+  {
+   "n": 15,
+   "category": "품질",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 16,
+   "category": "응대",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 17,
+   "category": "포장",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 18,
+   "category": "품질",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 19,
+   "category": "응대",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 20,
+   "category": "품질",
+   "sentiment": "부정",
+   "kind": "mixed"
+  },
+  {
+   "n": 21,
+   "category": "응대",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 22,
+   "category": "배송",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 23,
+   "category": "가격",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 24,
+   "category": "배송",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 25,
+   "category": "응대",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 26,
+   "category": "포장",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 27,
+   "category": "포장",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 28,
+   "category": "가격",
+   "sentiment": "부정",
+   "kind": "negation"
+  },
+  {
+   "n": 29,
+   "category": "배송",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 30,
+   "category": "품질",
+   "sentiment": "부정",
+   "kind": "sarcasm"
+  },
+  {
+   "n": 31,
+   "category": "응대",
+   "sentiment": "긍정",
+   "kind": "mixed"
+  },
+  {
+   "n": 32,
+   "category": "품질",
+   "sentiment": "긍정",
+   "kind": "negation"
+  },
+  {
+   "n": 33,
+   "category": "배송",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 34,
+   "category": "품질",
+   "sentiment": "긍정",
+   "kind": "mixed"
+  },
+  {
+   "n": 35,
+   "category": "배송",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 36,
+   "category": "품질",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 37,
+   "category": "가격",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 38,
+   "category": "품질",
+   "sentiment": "부정",
+   "kind": "plain"
+  },
+  {
+   "n": 39,
+   "category": "응대",
+   "sentiment": "긍정",
+   "kind": "plain"
+  },
+  {
+   "n": 40,
+   "category": "배송",
+   "sentiment": "부정",
+   "kind": "sarcasm"
+  }
+ ]
+}
