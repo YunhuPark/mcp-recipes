@@ -288,23 +288,73 @@ class PostTests(unittest.TestCase):
         self.assertEqual((code, t.calls), (3, []))
         self.assertIn("3회", out)
 
-    # 17
-    def test_scheduled_mode_posts_only_todays_reviewed_post_without_a_prompt(self):
+    def _three_manual(self):
         (self.root / post.STATE_FILE).write_text(json.dumps({"version": 1, "posts": {
             f"X{i}": {"state": "PUBLISHED", "mode": "manual", "published_at": "2026-10-10T09:00:00"} for i in range(3)}}),
             encoding="utf-8")
+
+    def _set_status(self, pid, old, new):
+        s = self.root / "posts" / "schedule.md"
+        text = s.read_text(encoding="utf-8")
+        lines = [l.replace(f"| {old} |", f"| {new} |") if l.startswith(f"| {pid} |") else l for l in text.splitlines()]
+        s.write_text(chr(10).join(lines) + chr(10), encoding="utf-8")
+
+    # 17
+    def test_scheduled_mode_posts_the_first_unposted_reviewed_post_without_a_prompt(self):
+        self._three_manual()
+        self._set_status("D01", "검수완료", "게시됨")
         t = FakeTransport(good_script())
         code, out = self.run_main(["--scheduled", "--publish"], t, confirm=lambda: self.fail("예약 실행은 확인을 묻지 않는다"))
         self.assertEqual(code, 0)
         self.assertEqual(self.state()["posts"]["D02"]["mode"], "scheduled")
         self.assertEqual(t.calls[0][2]["text"], "D02 본문입니다\n두 번째 줄")
 
-    def test_scheduled_mode_does_nothing_when_no_post_is_due(self):
-        (self.root / post.STATE_FILE).write_text(json.dumps({"version": 1, "posts": {
-            f"X{i}": {"state": "PUBLISHED", "mode": "manual", "published_at": "2026-10-10T09:00:00"} for i in range(3)}}),
-            encoding="utf-8")
+    def test_scheduled_preview_shows_the_pick_and_posts_nothing(self):
+        self._three_manual()
+        self._set_status("D01", "검수완료", "게시됨")
         t = FakeTransport(good_script())
-        code, out = self.run_main(["--scheduled", "--publish"], t, now=datetime(2026, 11, 20, 9, 0))
+        code, out = self.run_main(["--scheduled"], t)
+        self.assertEqual((code, t.calls), (0, []))
+        self.assertIn("D02", out)
+        self.assertIn("드라이런", out)
+        self.assertNotIn("D02", self.state()["posts"])
+
+    def test_scheduled_mode_follows_the_order_not_the_date(self):
+        # 날짜가 한참 지나도 D01이 아직이면 D01부터 (D03의 날짜가 오늘이어도 건너뛰지 않는다)
+        self._three_manual()
+        t = FakeTransport(good_script())
+        code, out = self.run_main(["--scheduled", "--publish"], t, now=datetime(2026, 10, 16, 9, 0))
+        self.assertEqual(code, 0)
+        self.assertEqual(t.calls[0][2]["text"], "D01 본문입니다\n두 번째 줄")
+        self.assertNotIn("D03", self.state()["posts"])
+
+    def test_scheduled_mode_stops_instead_of_skipping_a_post_that_is_not_ready(self):
+        self._three_manual()
+        self._set_status("D01", "검수완료", "게시됨")
+        self._set_status("D02", "검수완료", "초안")
+        t = FakeTransport(good_script())
+        code, out = self.run_main(["--scheduled", "--publish"], t)
+        self.assertEqual((code, t.calls), (0, []))
+        self.assertIn("D02", out)
+        self.assertIn("건너뛰지 않습니다", out)
+
+    def test_scheduled_mode_skips_a_post_the_state_file_already_shows_as_published(self):
+        # 게시는 됐는데 일정표 갱신이 실패한 경우에도 같은 글에서 멈추지 않는다
+        self._three_manual()
+        state = json.loads((self.root / post.STATE_FILE).read_text(encoding="utf-8"))
+        state["posts"]["D01"] = {"state": "PUBLISHED", "mode": "manual", "published_at": "2026-10-10T09:00:00"}
+        (self.root / post.STATE_FILE).write_text(json.dumps(state), encoding="utf-8")
+        t = FakeTransport(good_script())
+        code, out = self.run_main(["--scheduled", "--publish"], t)
+        self.assertEqual(code, 0)
+        self.assertEqual(t.calls[0][2]["text"], "D02 본문입니다\n두 번째 줄")
+
+    def test_scheduled_mode_does_nothing_when_nothing_is_left(self):
+        self._three_manual()
+        for pid in ("D01", "D02", "D03"):
+            self._set_status(pid, "검수완료", "게시됨")
+        t = FakeTransport(good_script())
+        code, out = self.run_main(["--scheduled", "--publish"], t)
         self.assertEqual((code, t.calls), (0, []))
         self.assertIn("아무것도 하지 않습니다", out)
 

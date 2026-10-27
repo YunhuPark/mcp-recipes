@@ -109,7 +109,7 @@ python scripts/insights.py                  # 게시한 글의 조회와 반응�
 
 ## 스케줄러 없이 하루 한 번 직접 올리기 (가장 단순한 방법)
 
-작업 스케줄러가 번거로우면(창이 뜨거나, 껐다 켤 때 겹치는 문제) **등록하지 않고** 노트북을 켠 뒤 한 번만 실행해도 된다. 수동 3번 성공을 채웠으므로 예약 모드(`--scheduled`)가 열려 있고, 이 모드는 확인 입력 없이 **오늘 날짜의 `검수완료` 글 하나**를 올린다.
+작업 스케줄러가 번거로우면(창이 뜨거나, 껐다 켤 때 겹치는 문제) **등록하지 않고** 노트북을 켠 뒤 한 번만 실행해도 된다. 수동 3번 성공을 채웠으므로 예약 모드(`--scheduled`)가 열려 있고, 이 모드는 확인 입력 없이 **일정표 순서상 아직 안 올린 첫 `검수완료` 글 하나**를 올린다.
 
 - 더블클릭: `scripts\post_today.cmd` (실행 뒤 결과와 발행 기록을 보여 주고 멈춘다)
 - 또는 터미널: `python scripts/post.py --scheduled --publish --topic "AI Threads"` (`THREADS_LIVE=yes` 필요)
@@ -130,7 +130,7 @@ powershell -ExecutionPolicy Bypass -File scriptsegister_task.ps1 -Remove       
 
 작업 스케줄러는 PC의 설정을 바꾸는 일이라 Claude가 임의로 등록하지 않는다. 등록할 때의 기준:
 
-- 매일 정해진 시각에 `python scripts\post.py --scheduled --publish`를 실행한다. 오늘 날짜의 `검수완료` 글만 올리고, 없으면 아무것도 하지 않는다.
+- 매일 정해진 시각에 `python scripts\post.py --scheduled --publish`를 실행한다. 일정표 순서(D 번호)대로 아직 안 올린 첫 글을 올린다. 날짜는 보지 않으므로 하루를 놓쳐도 순서가 이어진다. 그 글이 `검수완료`가 아니면 뒤의 글로 건너뛰지 않고 멈춘다.
 - `THREADS_LIVE=yes`는 평소 환경에 두지 않고, 작업의 실행 명령에서만 설정한다 (예: `cmd /c "set THREADS_LIVE=yes&& python scripts\post.py --scheduled --publish"`). 저장소 폴더에서 실행해야 한다.
 - 토큰은 사용자 환경 변수에서 읽는다. 작업 설정 안에 적지 않는다.
 - PC가 꺼져 있으면 그날은 올라가지 않는다. 늦게 켜져서 실행되더라도 오늘 날짜의 글만 고른다. 어긋나면 `--status`로 확인한다.

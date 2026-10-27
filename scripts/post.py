@@ -362,16 +362,21 @@ def cmd_resolve(state: State, root: Path, post_id: str, outcome: str, now: datet
     return 0
 
 
-def pick_scheduled(root: Path, now: datetime) -> str | None:
+def pick_scheduled(root: Path, state: "State") -> tuple[str | None, str]:
+    """일정표 순서대로 아직 안 올린 첫 글을 고른다. 날짜는 보지 않는다 (하루를 놓쳐도 순서가 이어지게).
+    그 글이 '검수완료'가 아니면 뒤의 글로 건너뛰지 않고 멈춘다. (고른 글 번호 또는 None, 사유)"""
     sched = root / "posts" / "schedule.md"
     for line in sched.read_text(encoding="utf-8").splitlines():
-        r = re.match(r"^\|\s*(D\d{2})\s*\|([^|]*)\|[^|]*\|([^|]*)\|", line)
+        r = re.match(r"^\|\s*(D\d{2})\s*\|[^|]*\|[^|]*\|([^|]*)\|", line)
         if not r:
             continue
-        d = re.search(r"(\d{2})/(\d{2})", r.group(2))
-        if d and (int(d.group(1)), int(d.group(2))) == (now.month, now.day) and r.group(3).strip() == "검수완료":
-            return r.group(1)
-    return None
+        pid, status = r.group(1), r.group(2).strip()
+        if status == "게시됨" or (state.get(pid) or {}).get("state") == "PUBLISHED":
+            continue
+        if status == "검수완료":
+            return pid, ""
+        return None, f"다음 순서인 {pid}가 '{status}' 상태라 멈춥니다 (뒤의 글로 건너뛰지 않습니다)."
+    return None, "올릴 글이 남아 있지 않습니다."
 
 
 def main(argv=None, *, transport=None, now: datetime | None = None, root: Path | None = None,
@@ -385,7 +390,7 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
     ap.add_argument("--check-token", action="store_true", help="토큰이 유효한지 읽기 전용으로 확인")
     ap.add_argument("--retry", action="store_true", help="게시되지 않은 채 실패한 글을 다시 시도")
     ap.add_argument("--resolve", choices=["published", "not_published"], help="불확실한 시도를 사람이 확인한 뒤 해소")
-    ap.add_argument("--scheduled", action="store_true", help="예약 실행(오늘 날짜의 검수완료 글을 고름)")
+    ap.add_argument("--scheduled", action="store_true", help="예약 실행(일정표 순서대로 아직 안 올린 첫 검수완료 글을 고름)")
     ap.add_argument("--topic", default=None, help=f"주제 태그(예: 'AI Threads'). 없으면 환경 변수 {TOPIC_ENV}, 그것도 없으면 태그 없이 올림")
     ap.add_argument("--allow-extra", action="store_true", help="하루 1개 제한을 풀기")
     ap.add_argument("--wait", type=float, default=DEFAULT_WAIT_SECONDS, help="컨테이너 생성 뒤 대기 초 (기본 30)")
@@ -411,16 +416,13 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
     post_id = args.post_id
     if args.scheduled:
         mode = "scheduled"
-        if not args.publish:
-            print("예약 실행은 --publish 와 함께 써야 합니다 (드라이런은 글 번호를 직접 주세요).")
-            return 2
         ok_count = state.count("PUBLISHED", "manual")
         if ok_count < GATE_MANUAL_SUCCESSES:
             print(f"예약 자동 발행은 수동 발행이 {GATE_MANUAL_SUCCESSES}회 성공한 뒤에 열립니다 (현재 {ok_count}회).")
             return 3
-        post_id = pick_scheduled(root, now)
+        post_id, why = pick_scheduled(root, state)
         if not post_id:
-            print("오늘 날짜의 '검수완료' 글이 없어 아무것도 하지 않습니다.")
+            print(f"{why} 아무것도 하지 않습니다.")
             return 0
     if not post_id:
         ap.print_help()
