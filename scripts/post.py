@@ -20,6 +20,8 @@
   6. 토큰은 환경 변수에서만 읽고, 어떤 출력과 기록에도 남기지 않는다.
   7. 같은 글은 두 번 올리지 않고, 하루에 한 개만 올린다.
   8. 예약 실행은 수동 발행이 3회 성공해야 열린다.
+  9. 사진은 글 파일의 `- 사진:` 줄(posts/images/ 안의 경로, 쉼표로 구분)로 붙인다. 발행 직전에 사진이 공개 저장소에
+     푸시되어 있고 로컬 파일과 바이트까지 같은지 확인한다. 아니면 게시하지 않는다. 1장은 이미지 글, 2장 이상은 캐러셀.
 
 기록 파일(.post-state.local.json)은 저장소에 올라가지 않는다.
 """
@@ -37,7 +39,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -52,6 +54,9 @@ STATE_FILE = ".post-state.local.json"
 STALE_MINUTES = 10
 GATE_MANUAL_SUCCESSES = 3
 DEFAULT_WAIT_SECONDS = 30  # 문서: 컨테이너를 만든 뒤 발행 전에 약 30초 기다린다
+IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
+IMAGE_MAX_BYTES = 8 * 1024 * 1024  # Threads 사진 한도
+IMAGE_MAX_COUNT = 20  # 캐러셀 한도
 
 
 # ---------------------------------------------------------------- 네트워크 (바꿔 끼울 수 있게 분리)
@@ -69,6 +74,18 @@ class RealTransport:
                 return r.status, _json(raw)
         except urllib.error.HTTPError as e:
             return e.code, _json(e.read().decode("utf-8", "replace"))
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            raise NetworkError(type(e).__name__) from None
+
+
+    def get_bytes(self, url: str, timeout: int = 30):
+        """공개 주소의 파일을 바이트로 읽는다 (사진이 푸시됐는지 확인용)."""
+        req = urllib.request.Request(url, method="GET")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return r.status, r.read(IMAGE_MAX_BYTES + 1)
+        except urllib.error.HTTPError as e:
+            return e.code, b""
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             raise NetworkError(type(e).__name__) from None
 
@@ -95,6 +112,7 @@ class Post:
     file_status: str
     sched_status: str
     sched_date: tuple[int, int] | None
+    images: list = field(default_factory=list)
 
 
 def load_post(root: Path, post_id: str) -> Post:
@@ -108,6 +126,8 @@ def load_post(root: Path, post_id: str) -> Post:
     if not m:
         raise SystemExit(f"{path.name}: 게시 본문(코드 블록)을 찾지 못했습니다")
     ms = re.search(r"-\s*상태:\s*\*\*([^*]+)\*\*", text)
+    mi = re.search(r"(?m)^-\s*사진:\s*(.+?)\s*$", text)
+    images = [x.strip() for x in mi.group(1).split(",") if x.strip()] if mi else []
     file_status = ms.group(1).strip().split()[0] if ms else ""
     sched_status, sched_date = "", None
     sched = root / "posts" / "schedule.md"
@@ -119,7 +139,7 @@ def load_post(root: Path, post_id: str) -> Post:
                 d = re.search(r"(\d{2})/(\d{2})", r.group(1))
                 sched_date = (int(d.group(1)), int(d.group(2))) if d else None
                 break
-    return Post(post_id, path, m.group(1).replace("\r", ""), file_status, sched_status, sched_date)
+    return Post(post_id, path, m.group(1).replace("\r", ""), file_status, sched_status, sched_date, images)
 
 
 # ---------------------------------------------------------------- 기록 (발행 전에 먼저 쓴다)
@@ -188,6 +208,67 @@ def run_site_check(root: Path) -> tuple[bool, str]:
     return r.returncode == 0, (r.stdout + r.stderr).strip()
 
 
+def image_problems(root: Path, post: Post) -> list[str]:
+    """사진의 로컬 조건만 본다 (네트워크 없음). 공개 주소 확인은 발행 직전에 따로 한다."""
+    out: list[str] = []
+    if len(post.images) > IMAGE_MAX_COUNT:
+        out.append(f"사진은 최대 {IMAGE_MAX_COUNT}장입니다 ({len(post.images)}장)")
+    base = (root / "posts" / "images").resolve()
+    for rel in post.images:
+        path = root / rel
+        try:
+            path.resolve().relative_to(base)
+        except ValueError:
+            out.append(f"사진은 posts/images/ 안에 있어야 합니다: {rel}")
+            continue
+        if path.suffix.lower() not in IMAGE_EXTS:
+            out.append(f"사진은 jpg 또는 png만 가능합니다: {rel}")
+        elif not path.is_file():
+            out.append(f"사진 파일이 없습니다: {rel}")
+        elif path.stat().st_size > IMAGE_MAX_BYTES:
+            out.append(f"사진이 8MB를 넘습니다: {rel}")
+    return out
+
+
+def default_image_base(root: Path) -> str | None:
+    """git 원격 저장소(github.com)에서 사진의 공개 주소 앞부분을 만든다. 기록에는 남기지 않는다."""
+    try:
+        r = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"], capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = re.search(r"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?\s*$", r.stdout.strip())
+    if r.returncode != 0 or not m:
+        return None
+    return f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/main"
+
+
+def image_urls_for(base: str, images: list[str]) -> list[str]:
+    return [f"{base}/{urllib.parse.quote(rel.replace(chr(92), '/'))}" for rel in images]
+
+
+def verify_public_images(root: Path, post: Post, base: str | None, transport) -> tuple[list[str], list[str]]:
+    """공개 주소에서 받은 사진이 로컬 파일과 바이트까지 같은지 확인한다. 푸시하지 않았거나 바뀐 사진을 올리지 않으려는 것이다.
+    반환: (문제 목록, 공개 주소 목록)"""
+    if not base:
+        return ["사진의 공개 주소를 만들지 못했습니다 (git 원격 저장소가 github.com 이어야 합니다)"], []
+    getter = getattr(transport, "get_bytes", None)
+    if getter is None:
+        return ["이 전송 방식은 사진 확인을 지원하지 않습니다"], []
+    urls = image_urls_for(base, post.images)
+    problems: list[str] = []
+    for rel, url in zip(post.images, urls):
+        try:
+            status, data = getter(url)
+        except NetworkError as e:
+            problems.append(f"사진의 공개 주소를 읽지 못했습니다({e}): {rel}")
+            continue
+        if status != 200:
+            problems.append(f"사진이 아직 공개 저장소에 없습니다 (HTTP {status}). 커밋하고 푸시한 뒤 몇 분 지나 다시 하세요: {rel}")
+        elif hashlib.sha256(data).digest() != hashlib.sha256((root / rel).read_bytes()).digest():
+            problems.append(f"공개 저장소의 사진이 로컬 파일과 다릅니다. 푸시하세요: {rel}")
+    return problems, urls
+
+
 def eligibility(post: Post, state: State, root: Path, now: datetime, *, retry: bool,
                 allow_extra: bool, check=run_site_check) -> list[str]:
     problems: list[str] = []
@@ -200,6 +281,7 @@ def eligibility(post: Post, state: State, root: Path, now: datetime, *, retry: b
         problems.append(f"Threads 기준 길이가 {n}로 {LIMIT}을 넘습니다")
     if not post.body.strip():
         problems.append("본문이 비어 있습니다")
+    problems += image_problems(root, post)
     rec = state.get(post.id)
     if rec:
         s = rec.get("state")
@@ -237,7 +319,7 @@ def _fail_text(status, body, token) -> str:
 
 def publish_post(root: Path, post: Post, state: State, transport, token: str, user_id: str, *,
                  mode: str, wait_seconds: float, now: datetime, sleep=time.sleep,
-                 topic: str | None = None) -> tuple[str, str]:
+                 topic: str | None = None, image_urls: list[str] | None = None) -> tuple[str, str]:
     """반환: (결과 상태, 설명). 어떤 경우에도 자동으로 다시 시도하지 않는다."""
     attempt = {
         "attempt_id": uuid.uuid4().hex, "mode": mode, "started": now.isoformat(timespec="seconds"),
@@ -247,8 +329,30 @@ def publish_post(root: Path, post: Post, state: State, transport, token: str, us
     state.set(post.id, **attempt)  # <- API를 부르기 전에 먼저 기록한다
 
     # 1단계: 컨테이너 만들기 (여기서 실패하면 게시된 것이 없다)
+    if image_urls and len(image_urls) > 1:  # 캐러셀: 사진마다 자식 컨테이너를 먼저 만든다
+        children: list[str] = []
+        for u in image_urls:
+            try:
+                status, body = transport.request("POST", f"{API_BASE}/{user_id}/threads", {
+                    "media_type": "IMAGE", "image_url": u, "is_carousel_item": "true", "access_token": token})
+            except NetworkError as e:
+                state.set(post.id, state="FAILED", reason=f"사진 컨테이너 생성 중 네트워크 오류({e}). 게시되지 않음")
+                return "FAILED", "사진 컨테이너 생성 중 네트워크 오류. 게시되지 않았습니다"
+            cid = body.get("id") if isinstance(body, dict) else None
+            if not (200 <= status < 300) or not cid:
+                why = _fail_text(status, body, token)
+                state.set(post.id, state="FAILED", reason=f"사진 컨테이너 생성 실패: {why}. 게시되지 않음")
+                return "FAILED", f"사진 컨테이너 생성 실패 ({why}). 게시되지 않았습니다"
+            children.append(str(cid))
+        state.set(post.id, children=children)
+        sleep(wait_seconds)
     try:
-        container = {"media_type": "TEXT", "text": post.body, "access_token": token}
+        if not image_urls:
+            container = {"media_type": "TEXT", "text": post.body, "access_token": token}
+        elif len(image_urls) == 1:
+            container = {"media_type": "IMAGE", "image_url": image_urls[0], "text": post.body, "access_token": token}
+        else:
+            container = {"media_type": "CAROUSEL", "children": ",".join(children), "text": post.body, "access_token": token}
         if topic:
             container["topic_tag"] = topic
         status, body = transport.request("POST", f"{API_BASE}/{user_id}/threads", container)
@@ -380,7 +484,7 @@ def pick_scheduled(root: Path, state: "State") -> tuple[str | None, str]:
 
 
 def main(argv=None, *, transport=None, now: datetime | None = None, root: Path | None = None,
-         confirm=None, sleep=time.sleep, check=run_site_check) -> int:
+         confirm=None, sleep=time.sleep, check=run_site_check, image_base: str | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description="Threads 게시 도구 (기본은 드라이런)")
@@ -434,6 +538,10 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
     print(f"-- Threads 기준 길이 {threads_len(post.body)} / {LIMIT} --")
     topic = (args.topic if args.topic is not None else os.environ.get(TOPIC_ENV, "")).strip()
     print(f"-- 주제 태그: {topic or '(없음)'} --")
+    if post.images:
+        print(f"-- 사진 {len(post.images)}장 ({'이미지 글' if len(post.images) == 1 else '캐러셀'}) --")
+        for rel in post.images:
+            print(f"   {rel}")
 
     problems = eligibility(post, state, root, now, retry=args.retry, allow_extra=args.allow_extra, check=check)
     if topic and validate_topic(topic):
@@ -446,6 +554,8 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
 
     if not args.publish:
         print("\n[드라이런] 아무것도 게시하지 않았습니다.")
+        if post.images:
+            print("(사진이 공개 저장소에 올라가 있는지는 실제 발행 때 확인합니다)")
         if problems:
             print("실제로 발행하려면 먼저 해결해야 할 문제:")
             for p in problems:
@@ -467,15 +577,25 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
         print(f"\n발행하지 않습니다: {TOKEN_ENV}, {USER_ENV} 가 필요합니다. 다른 토큰으로 대체하지 않습니다.")
         return 1
 
+    transport = transport or RealTransport()
+    urls = None
+    if post.images:
+        base = image_base if image_base is not None else default_image_base(root)
+        img_problems, urls = verify_public_images(root, post, base, transport)
+        if img_problems:
+            print("\n발행하지 않습니다:")
+            for p in img_problems:
+                print(f"  - {p}")
+            return 1
+
     if mode == "manual":
         answer = confirm() if confirm else (input("\n위 내용을 지금 게시합니다. 정확히 'yes' 를 입력하세요: ") if sys.stdin.isatty() else "")
         if str(answer).strip() != "yes":
             print("확인되지 않아 발행하지 않았습니다.")
             return 1
 
-    transport = transport or RealTransport()
     result, msg = publish_post(root, post, state, transport, token, user_id, mode=mode,
-                               wait_seconds=args.wait, now=now, sleep=sleep, topic=topic or None)
+                               wait_seconds=args.wait, now=now, sleep=sleep, topic=topic or None, image_urls=urls)
     print(f"\n[{result}] {msg}")
     if result == "PUBLISHED":
         try:

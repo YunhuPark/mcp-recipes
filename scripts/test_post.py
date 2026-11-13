@@ -25,8 +25,16 @@ OK_CHECK = lambda root: (True, "")  # noqa: E731
 
 
 class FakeTransport:
-    def __init__(self, script, on_call=None):
+    def __init__(self, script, on_call=None, files=None):
         self.script, self.calls, self.on_call = list(script), [], on_call
+        self.files, self.fetched = dict(files or {}), []
+
+    def get_bytes(self, url, timeout=30):
+        self.fetched.append(url)
+        item = self.files.get(url, (404, b""))
+        if isinstance(item, Exception):
+            raise item
+        return item
 
     def request(self, method, url, data, timeout=30):
         self.calls.append((method, url, dict(data or {})))
@@ -74,11 +82,12 @@ class PostTests(unittest.TestCase):
         self._env.stop()
         self._tmp.cleanup()
 
-    def run_main(self, argv, transport=None, now=NOW, confirm=lambda: "yes", check=OK_CHECK):
+    def run_main(self, argv, transport=None, now=NOW, confirm=lambda: "yes", check=OK_CHECK, image_base=None):
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             code = post.main(argv + ["--root", str(self.root), "--wait", "0"], transport=transport, now=now,
-                             root=self.root, confirm=confirm, sleep=self.sleeps.append, check=check)
+                             root=self.root, confirm=confirm, sleep=self.sleeps.append, check=check,
+                             image_base=image_base)
         return code, out.getvalue()
 
     def state(self):
@@ -403,6 +412,117 @@ class PostTests(unittest.TestCase):
         code, out = self.run_main(["--status"])
         self.assertEqual(code, 0)
         self.assertEqual(self.run_main(["D02", "--resolve", "published"])[0], 2)  # 불확실이 아니면 풀 수 없다
+
+    # ---- 사진
+    BASE = "https://img.test/raw/main"
+
+    def add_images(self, n, post_id="D02"):
+        """D02 글 파일에 사진 줄을 넣고, 사진 파일 n개를 만든다. 공개 주소별 바이트를 돌려준다."""
+        names = [f"posts/images/{post_id}/{post_id}-{i + 1}.jpg" for i in range(n)]
+        data = {}
+        for i, rel in enumerate(names):
+            f = self.root / rel
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(b"\xff\xd8fake-jpeg-" + str(i).encode())
+            data[post.image_urls_for(self.BASE, [rel])[0]] = (200, f.read_bytes())
+        daily = next((self.root / "posts" / "daily").glob(f"{post_id}-*.md"))
+        text = daily.read_text(encoding="utf-8")
+        daily.write_text(text.replace("- 글자 수: 10자\n", "- 글자 수: 10자\n- 사진: " + ", ".join(names) + "\n", 1), encoding="utf-8")
+        return names, data
+
+    def test_images_dry_run_lists_them_and_makes_no_calls(self):
+        names, files = self.add_images(2)
+        t = FakeTransport([], files=files)
+        code, out = self.run_main(["D02"], t, image_base=self.BASE)
+        self.assertEqual(code, 0)
+        self.assertEqual((t.calls, t.fetched), ([], []))
+        self.assertIn("사진 2장", out)
+        self.assertIn(names[0], out)
+
+    def test_carousel_posts_children_then_parent_then_publishes(self):
+        names, files = self.add_images(3)
+        t = FakeTransport([(200, {"id": "K1"}), (200, {"id": "K2"}), (200, {"id": "K3"}),
+                           (200, {"id": "PARENT"}), (200, {"id": "MEDIA9"})], files=files)
+        code, out = self.run_main(["D02", "--publish", "--topic", "AI Threads"], t, image_base=self.BASE)
+        self.assertEqual(code, 0, out)
+        kids = [c[2] for c in t.calls[:3]]
+        self.assertEqual([k["media_type"] for k in kids], ["IMAGE"] * 3)
+        self.assertTrue(all(k["is_carousel_item"] == "true" for k in kids))
+        self.assertEqual([k["image_url"] for k in kids], list(files.keys()))
+        parent = t.calls[3][2]
+        self.assertEqual(parent["media_type"], "CAROUSEL")
+        self.assertEqual(parent["children"], "K1,K2,K3")
+        self.assertEqual(parent["text"], "D02 본문입니다\n두 번째 줄")
+        self.assertEqual(parent["topic_tag"], "AI Threads")
+        self.assertEqual(t.calls[4][2]["creation_id"], "PARENT")
+        self.assertEqual(self.state()["posts"]["D02"]["state"], "PUBLISHED")
+        self.assertEqual(self.state()["posts"]["D02"]["children"], ["K1", "K2", "K3"])
+
+    def test_single_image_is_an_image_post_without_children(self):
+        names, files = self.add_images(1)
+        t = FakeTransport(good_script(), files=files)
+        code, out = self.run_main(["D02", "--publish"], t, image_base=self.BASE)
+        self.assertEqual(code, 0, out)
+        self.assertEqual(len(t.calls), 2)
+        self.assertEqual(t.calls[0][2]["media_type"], "IMAGE")
+        self.assertEqual(t.calls[0][2]["image_url"], list(files.keys())[0])
+        self.assertNotIn("is_carousel_item", t.calls[0][2])
+
+    def test_a_picture_that_is_not_public_yet_blocks_publishing(self):
+        names, files = self.add_images(2)
+        files.pop(next(iter(files)))  # 첫 사진은 아직 푸시되지 않음 -> 404
+        t = FakeTransport(good_script(), files=files)
+        code, out = self.run_main(["D02", "--publish"], t, image_base=self.BASE)
+        self.assertEqual((code, t.calls), (1, []))
+        self.assertIn("공개 저장소에 없습니다", out)
+        self.assertFalse((self.root / post.STATE_FILE).exists())
+
+    def test_a_picture_that_differs_from_the_local_file_blocks_publishing(self):
+        names, files = self.add_images(2)
+        k = next(iter(files))
+        files[k] = (200, b"someone-elses-bytes")
+        t = FakeTransport(good_script(), files=files)
+        code, out = self.run_main(["D02", "--publish"], t, image_base=self.BASE)
+        self.assertEqual((code, t.calls), (1, []))
+        self.assertIn("로컬 파일과 다릅니다", out)
+
+    def test_a_missing_local_picture_or_a_path_outside_images_is_refused(self):
+        names, files = self.add_images(2)
+        (self.root / names[0]).unlink()
+        t = FakeTransport(good_script(), files=files)
+        code, out = self.run_main(["D02", "--publish"], t, image_base=self.BASE)
+        self.assertEqual((code, t.calls, t.fetched), (1, [], []))
+        self.assertIn("사진 파일이 없습니다", out)
+        daily = next((self.root / "posts" / "daily").glob("D02-*.md"))
+        daily.write_text(daily.read_text(encoding="utf-8").replace(names[0], "../secret.jpg"), encoding="utf-8")
+        code, out = self.run_main(["D02", "--publish"], FakeTransport(good_script(), files=files), image_base=self.BASE)
+        self.assertEqual(code, 1)
+        self.assertIn("posts/images/ 안에 있어야", out)
+
+    def test_a_failed_child_container_posts_nothing(self):
+        names, files = self.add_images(3)
+        t = FakeTransport([(200, {"id": "K1"}), (400, {"error": {"message": "bad image"}})], files=files)
+        code, out = self.run_main(["D02", "--publish"], t, image_base=self.BASE)
+        self.assertEqual(code, 1)
+        self.assertEqual(len(t.calls), 2)  # 부모 컨테이너도 발행도 호출하지 않는다
+        self.assertEqual(self.state()["posts"]["D02"]["state"], "FAILED")
+        self.assertIn("게시되지 않았습니다", out)
+
+    def test_unreachable_public_address_blocks_publishing(self):
+        names, files = self.add_images(2)
+        files = {u: post.NetworkError("URLError") for u in files}
+        t = FakeTransport(good_script(), files=files)
+        code, out = self.run_main(["D02", "--publish"], t, image_base=self.BASE)
+        self.assertEqual((code, t.calls), (1, []))
+        self.assertIn("읽지 못했습니다", out)
+
+    def test_no_public_base_blocks_image_posts(self):
+        names, files = self.add_images(2)
+        t = FakeTransport(good_script(), files=files)
+        with mock.patch.object(post, "default_image_base", return_value=None):
+            code, out = self.run_main(["D02", "--publish"], t)
+        self.assertEqual((code, t.calls), (1, []))
+        self.assertIn("공개 주소를 만들지 못했습니다", out)
 
 
 if __name__ == "__main__":
