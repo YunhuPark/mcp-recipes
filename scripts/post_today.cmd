@@ -14,6 +14,7 @@ choice /c YN /n /m "Post this now? [Y/N] "
 if errorlevel 2 (
   echo Cancelled. Nothing was posted.
 ) else (
+  echo Posting now. This takes about 1 minute (1-2 minutes with photos). Do NOT press Ctrl+C or close this window.
   python scripts\post.py --scheduled --publish --topic "AI Threads"
   echo.
   python scripts\post.py --status

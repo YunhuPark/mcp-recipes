@@ -1,6 +1,6 @@
 # D24 · 2026-11-13 (금) · 영상 속 라벨 글자가 그대로 나오나 (Gemini)
 
-- 상태: **검수완료** (2026-11-13, 사용자 확인. approve.py --batch로 확정)
+- 상태: **게시됨** (2026-11-13 09:46, post.py)
 - 글자 수: 298자
 - 사진: posts/images/D24/D24-1-0.2s.jpg, posts/images/D24/D24-2-2.0s.jpg, posts/images/D24/D24-3-4.0s.jpg, posts/images/D24/D24-4-6.0s.jpg, posts/images/D24/D24-5-9.9s.jpg
 - 근거: `validation-log.md` 시험: 영상 속 라벨 글자가 그대로 나오는가 (2026-11-12), 자료 `validation-data/video/`
