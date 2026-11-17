@@ -76,9 +76,12 @@ class PostTests(unittest.TestCase):
                     "THREADS_TOKEN_EXPIRES": "2026-12-01"})
         self._env = mock.patch.dict(os.environ, env, clear=True)
         self._env.start()
+        self._home = mock.patch.object(post.Path, "home", return_value=Path(self._tmp.name) / "test-home")
+        self._home.start()
         self.sleeps = []
 
     def tearDown(self):
+        self._home.stop()
         self._env.stop()
         self._tmp.cleanup()
 

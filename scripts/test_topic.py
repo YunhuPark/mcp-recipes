@@ -39,8 +39,11 @@ class TopicPublishTests(unittest.TestCase):
                     "THREADS_TOKEN_EXPIRES": "2026-12-01"})
         self._env = mock.patch.dict(os.environ, env, clear=True)
         self._env.start()
+        self._home = mock.patch.object(post.Path, "home", return_value=Path(self._tmp.name) / "test-home")
+        self._home.start()
 
     def tearDown(self):
+        self._home.stop()
         self._env.stop()
         self._tmp.cleanup()
 
@@ -73,7 +76,12 @@ class TopicPublishTests(unittest.TestCase):
         t = tp.FakeTransport(tp.good_script())
         self.run_main(["D02", "--publish"], t)
         self.assertEqual(self.container_data(t)["topic_tag"], "환경 기본")
-        self.root = tp.make_root(Path(tempfile.mkdtemp()))  # 첫 게시가 글 상태를 '게시됨'으로 바꾸므로 새로 만든다
+        second = tempfile.TemporaryDirectory()
+        self.addCleanup(second.cleanup)
+        self.root = tp.make_root(Path(second.name))
+        # This is an independent topic fixture, with an independent account.
+        # The same account must never publish from a second checkout.
+        os.environ["THREADS_USER_ID"] = "topic-override-account"
         t2 = tp.FakeTransport(tp.good_script())
         self.run_main(["D02", "--publish", "--topic", "직접 지정"], t2)
         self.assertEqual(self.container_data(t2)["topic_tag"], "직접 지정")
