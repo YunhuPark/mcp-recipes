@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager, ExitStack
 import hashlib
 import json
 import os
@@ -101,6 +102,83 @@ def redact(text: str, token: str | None) -> str:
     if token:
         text = text.replace(token, "[토큰 가림]")
     return re.sub(r"(?i)(access_token=)[^&\s\"']+", r"\1[토큰 가림]", text)
+
+
+class PublishBusy(RuntimeError):
+    pass
+
+
+@contextmanager
+def _file_lock(path: Path):
+    # Do not unlink: another process may still hold the previous inode.
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with path.open("a+b") as lock:
+        lock.seek(0, 2)
+        if lock.tell() == 0:
+            lock.write(b"0")
+            lock.flush()
+        lock.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as exc:
+            raise PublishBusy("Another publishing process is active; retry later.") from exc
+        try:
+            yield
+        finally:
+            lock.seek(0)
+            if os.name == "nt":
+                msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def _account_store() -> Path:
+    # Durable per-OS-user storage: clearing OS temp must not erase ownership.
+    identity = str(Path.home()) + "\0" + os.environ.get(USER_ENV, "")
+    account = hashlib.sha256(identity.encode()).hexdigest()
+    return Path.home() / ".mcp-recipes" / "publishing" / account
+
+
+def require_canonical_checkout(root: Path) -> None:
+    """Called under both publishing locks before any publishing transport call.
+
+    Keep eligibility state in one checkout instead of pretending separate local
+    state files become account-wide merely by serializing their access.
+    """
+    owner_path = _account_store().with_suffix(".owner.json")
+    canonical = os.path.normcase(str(root.resolve()))
+    try:
+        # Exclusive first claim while holding the account OS lock. A crash while
+        # writing leaves an invalid record that fails closed, never a new owner.
+        try:
+            with owner_path.open("x", encoding="utf-8") as record:
+                json.dump({"version": 1, "root": canonical}, record)
+                record.flush()
+                os.fsync(record.fileno())
+        except FileExistsError:
+            pass
+        owner = json.loads(owner_path.read_text(encoding="utf-8"))
+        if not isinstance(owner, dict) or owner.get("version") != 1 or owner.get("root") != canonical:
+            raise PublishBusy("Use the canonical publishing checkout for this account; "
+                              "other checkouts cannot publish or resolve attempts.")
+    except (OSError, ValueError) as exc:
+        raise PublishBusy("Cannot verify the canonical publishing checkout; "
+                          "inspect the durable ownership record before retrying.") from exc
+
+
+@contextmanager
+def publishing_locks(root: Path):
+    # Repository protects local state/files; durable account lock protects owner.
+    account_path = _account_store().with_suffix(".lock")
+    with ExitStack() as stack:
+        stack.enter_context(_file_lock(root / ".post-publish.lock"))
+        stack.enter_context(_file_lock(account_path))
+        yield
 
 
 # ---------------------------------------------------------------- 글과 일정 읽기
@@ -503,6 +581,15 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
 
     root = Path(root or args.root or Path(__file__).resolve().parent.parent).resolve()
     now = now or datetime.now()
+    try:
+        with publishing_locks(root):
+            return _main_locked(args, root, now, transport, confirm, sleep, check, image_base, ap)
+    except PublishBusy as exc:
+        print(str(exc))
+        return 1
+
+
+def _main_locked(args, root, now, transport, confirm, sleep, check, image_base, ap):
     state = State(root / STATE_FILE)
     state.settle_stale(now)
 
@@ -514,6 +601,10 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
         if not args.post_id:
             print("--resolve 에는 글 번호가 필요합니다 (예: D02)")
             return 2
+        if not os.environ.get(USER_ENV, ""):
+            print(f"{USER_ENV} is required to verify the canonical publishing checkout.")
+            return 1
+        require_canonical_checkout(root)
         return cmd_resolve(state, root, args.post_id, args.resolve, now)
 
     mode = "manual"
@@ -577,6 +668,7 @@ def main(argv=None, *, transport=None, now: datetime | None = None, root: Path |
         print(f"\n발행하지 않습니다: {TOKEN_ENV}, {USER_ENV} 가 필요합니다. 다른 토큰으로 대체하지 않습니다.")
         return 1
 
+    require_canonical_checkout(root)
     transport = transport or RealTransport()
     urls = None
     if post.images:
