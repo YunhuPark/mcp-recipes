@@ -1,0 +1,113 @@
+{
+ "seed": 2748401922,
+ "meetings": [
+  {
+   "meeting": 1,
+   "date": "2026-11-23",
+   "items": [
+    {
+     "task": "쿠폰 정산 숫자 확인",
+     "owner": "나은",
+     "due": null,
+     "kind": "no_due"
+    },
+    {
+     "task": "주간 성과 리포트 정리",
+     "owner": null,
+     "due": "2026-12-07",
+     "kind": "no_owner"
+    },
+    {
+     "task": "신규 캠페인 랜딩 문구 초안 작성",
+     "owner": null,
+     "due": "2026-12-01",
+     "kind": "no_owner"
+    },
+    {
+     "task": "상세페이지 이미지 교체",
+     "owner": null,
+     "due": "2026-12-03",
+     "kind": "no_owner"
+    },
+    {
+     "task": "경품 배송 업체 견적 받기",
+     "owner": "하늘",
+     "due": "2026-11-26",
+     "kind": "full"
+    }
+   ]
+  },
+  {
+   "meeting": 2,
+   "date": "2026-11-24",
+   "items": [
+    {
+     "task": "경쟁사 가격표 조사",
+     "owner": "서아",
+     "due": "2026-12-02",
+     "kind": "full"
+    },
+    {
+     "task": "고객 문의 템플릿 정리",
+     "owner": "지호",
+     "due": "2026-12-02",
+     "kind": "full"
+    },
+    {
+     "task": "이벤트 당첨자 안내문 작성",
+     "owner": "서아",
+     "due": "2026-12-04",
+     "kind": "full"
+    },
+    {
+     "task": "제휴 문의 메일 회신",
+     "owner": "도윤",
+     "due": "2026-12-03",
+     "kind": "full"
+    },
+    {
+     "task": "블로그 글 3편 일정 잡기",
+     "owner": "서아",
+     "due": null,
+     "kind": "no_due"
+    }
+   ]
+  },
+  {
+   "meeting": 3,
+   "date": "2026-11-25",
+   "items": [
+    {
+     "task": "뉴스레터 발송 일정 확정",
+     "owner": "지호",
+     "due": null,
+     "kind": "no_due"
+    },
+    {
+     "task": "촬영 장소 후보 3곳 확인",
+     "owner": null,
+     "due": "2026-11-30",
+     "kind": "no_owner"
+    },
+    {
+     "task": "광고 소재 A/B 안 2개 준비",
+     "owner": null,
+     "due": null,
+     "kind": "neither"
+    },
+    {
+     "task": "고객 인터뷰 질문지 작성",
+     "owner": "예린",
+     "due": null,
+     "kind": "no_due"
+    },
+    {
+     "task": "인스타그램 카드뉴스 6장 제작",
+     "owner": "지호",
+     "due": "2026-12-01",
+     "kind": "full"
+    }
+   ]
+  }
+ ]
+}
