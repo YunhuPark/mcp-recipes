@@ -2,6 +2,7 @@
 
 - 상태: **검수완료** (2026-11-19, 사용자 확인. approve.py --batch로 확정)
 - 글자 수: 263자
+- 사진: posts/images/D31/D31-card.png
 - 근거: `validation-log.md` 시험: 오타는 처음 쓸 때 생기는가, 저장할 때 생기는가 (3차, 2026-11-19), 자료 `validation-data/typo-trace2/`
 
 ```

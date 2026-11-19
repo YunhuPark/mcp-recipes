@@ -2,6 +2,7 @@
 
 - 상태: **검수완료** (2026-11-19, 사용자 확인. approve.py --batch로 확정)
 - 글자 수: 319자
+- 사진: posts/images/D29/D29-card.png
 - 근거: `validation-log.md` 레시피 03, 2026-11-19, 자료 `validation-data/ads-noinstr/`
 
 ```
