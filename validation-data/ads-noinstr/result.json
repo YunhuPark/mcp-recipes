@@ -1,0 +1,59 @@
+{
+ "campaigns": [
+  {
+   "name": "봄맞이 프로모션",
+   "impressions": 151757,
+   "clicks": 21213,
+   "cost": 2396530,
+   "conversions": 304,
+   "conversion_value": 6122000,
+   "ctr": 0.1398,
+   "cpc": 113,
+   "roas": 2.55
+  },
+  {
+   "name": "신규 가입 유도",
+   "impressions": 143455,
+   "clicks": 3907,
+   "cost": 1890470,
+   "conversions": 90,
+   "conversion_value": 1356000,
+   "ctr": 0.0272,
+   "cpc": 484,
+   "roas": 0.72
+  },
+  {
+   "name": "리마케팅 A",
+   "impressions": 160120,
+   "clicks": 4351,
+   "cost": 1534820,
+   "conversions": 70,
+   "conversion_value": 3112000,
+   "ctr": 0.0272,
+   "cpc": 353,
+   "roas": 2.03
+  },
+  {
+   "name": "브랜드 검색",
+   "impressions": 259321,
+   "clicks": 5908,
+   "cost": 2423440,
+   "conversions": 233,
+   "conversion_value": 4453000,
+   "ctr": 0.0228,
+   "cpc": 410,
+   "roas": 1.84
+  },
+  {
+   "name": "시즌 한정 세트",
+   "impressions": 166147,
+   "clicks": 4720,
+   "cost": 2777300,
+   "conversions": 241,
+   "conversion_value": 7709000,
+   "ctr": 0.0284,
+   "cpc": 588,
+   "roas": 2.78
+  }
+ ]
+}
