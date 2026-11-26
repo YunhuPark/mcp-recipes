@@ -1,0 +1,122 @@
+[
+ {
+  "category": "배송",
+  "sentiment": "긍정",
+  "text": "주문한 다음 날 바로 도착했어요",
+  "n": 1
+ },
+ {
+  "category": "품질",
+  "sentiment": "긍정",
+  "text": "한 달 써도 처음 그대로예요",
+  "n": 2
+ },
+ {
+  "category": "응대",
+  "sentiment": "긍정",
+  "text": "문의에 바로 답해 주셔서 감사했어요",
+  "n": 3
+ },
+ {
+  "category": "품질",
+  "sentiment": "긍정",
+  "text": "마감이 깔끔하고 튼튼해요",
+  "n": 4
+ },
+ {
+  "category": null,
+  "sentiment": "부정",
+  "text": "광고 문자가 하루에 세 번씩 와요",
+  "n": 5
+ },
+ {
+  "category": "가격",
+  "sentiment": "긍정",
+  "text": "가성비가 정말 훌륭합니다",
+  "n": 6
+ },
+ {
+  "category": "포장",
+  "sentiment": "긍정",
+  "text": "포장이 꼼꼼해서 안전하게 왔어요",
+  "n": 7
+ },
+ {
+  "category": "배송",
+  "sentiment": "부정",
+  "text": "배송이 일주일이나 걸렸어요",
+  "n": 8
+ },
+ {
+  "category": "응대",
+  "sentiment": "부정",
+  "text": "환불 요청했는데 계속 떠넘기기만 해요",
+  "n": 9
+ },
+ {
+  "category": null,
+  "sentiment": "부정",
+  "text": "홈페이지 로그인이 계속 실패해요",
+  "n": 10
+ },
+ {
+  "category": "가격",
+  "sentiment": "부정",
+  "text": "비슷한 제품보다 너무 비싸요",
+  "n": 11
+ },
+ {
+  "category": null,
+  "sentiment": "부정",
+  "text": "회원 가입 절차가 너무 길어요",
+  "n": 12
+ },
+ {
+  "category": "품질",
+  "sentiment": "부정",
+  "text": "며칠 쓰니 바로 고장 났어요",
+  "n": 13
+ },
+ {
+  "category": null,
+  "sentiment": "부정",
+  "text": "앱이 결제 화면에서 자꾸 꺼져요",
+  "n": 14
+ },
+ {
+  "category": null,
+  "sentiment": "부정",
+  "text": "매장 주차장이 너무 좁았어요",
+  "n": 15
+ },
+ {
+  "category": "포장",
+  "sentiment": "부정",
+  "text": "상자가 찌그러진 채로 왔어요",
+  "n": 16
+ },
+ {
+  "category": null,
+  "sentiment": "부정",
+  "text": "영업시간이 너무 짧아 두 번 헛걸음했어요",
+  "n": 17
+ },
+ {
+  "category": null,
+  "sentiment": "긍정",
+  "text": "매장에서 나오던 음악이 좋았어요",
+  "n": 18
+ },
+ {
+  "category": null,
+  "sentiment": "긍정",
+  "text": "홈페이지 디자인이 보기 편해졌네요",
+  "n": 19
+ },
+ {
+  "category": "배송",
+  "sentiment": "긍정",
+  "text": "약속한 날짜보다 일찍 왔어요",
+  "n": 20
+ }
+]
