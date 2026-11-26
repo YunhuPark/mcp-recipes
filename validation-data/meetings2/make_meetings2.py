@@ -19,13 +19,15 @@ TASKS = [
     "신규 캠페인 랜딩 문구 초안 작성", "주간 성과 리포트 정리", "인스타그램 카드뉴스 6장 제작", "뉴스레터 발송 일정 확정",
     "경쟁사 가격표 조사", "광고 소재 A/B 안 2개 준비", "고객 인터뷰 질문지 작성", "블로그 글 3편 일정 잡기",
     "쿠폰 정산 숫자 확인", "제휴 문의 메일 회신", "촬영 장소 후보 3곳 확인", "이벤트 당첨자 안내문 작성",
-    "상세페이지 이미지 교체", "고객 문의 템플릿 정리", "경품 배송 업체 견적 받기",
+    "상세페이지 이미지 교체", "고객 문의 템플릿 정리", "경품 배송 업체 견적 받기", "행사 현수막 시안 요청",
 ]
 DONE = ["지난 회의에서 정한 로고 수정은 이미 끝났음", "예산 승인은 지난주에 완료됨", "촬영 섭외는 어제 마무리됨"]
 IDEA = ["숏폼 영상을 해볼지는 의견만 나눴고 결정하지 않음", "새 채널 개설은 다음에 다시 이야기하기로 함", "가격 인상은 논의만 하고 보류"]
-kinds = ["full"] * 6 + ["no_owner"] * 4 + ["no_due"] * 4 + ["neither"] * 1
+V2 = len(sys.argv) > 3 and sys.argv[3] == "v2"  # v2: 네 유형 4개씩, "둘 다 없음"에 의견 같은 문구를 쓰지 않는다
+kinds = ["full", "no_owner", "no_due", "neither"] * 4 if V2 else ["full"] * 6 + ["no_owner"] * 4 + ["no_due"] * 4 + ["neither"] * 1
 rnd.shuffle(kinds)
-tasks = rnd.sample(TASKS, 15)
+tasks = rnd.sample(TASKS, len(kinds))
+PER = [6, 5, 5] if V2 else [5, 5, 5]
 meetings, truth = [], []
 start = date(2026, 11, 23)
 k = 0
@@ -33,7 +35,7 @@ for i in range(3):
     meet = start + timedelta(days=i)
     people = rnd.sample(PEOPLE, 4)
     lines, items = [], []
-    for _ in range(5):
+    for _ in range(PER[i]):
         t, kind = tasks[k], kinds[k]
         k += 1
         owner = rnd.choice(people) if kind in ("full", "no_due") else None
@@ -51,7 +53,7 @@ for i in range(3):
         elif kind == "no_due":
             line = rnd.choice(["{w}가 {t} 하기로 함", "{t}은(는) {w} 담당", "{w}: {t}"]).format(w=owner, t=t)
         else:
-            line = rnd.choice(["{t} 해야 함", "{t} 논의 필요", "{t}도 해야 한다는 의견"]).format(t=t)
+            line = rnd.choice(["{t} 해야 함", "{t} 진행하기로 함"] if V2 else ["{t} 해야 함", "{t} 논의 필요", "{t}도 해야 한다는 의견"]).format(t=t)
         lines.append("- " + line)
         items.append({"task": t, "owner": owner, "due": due.isoformat() if due else None, "kind": kind})
     lines.insert(rnd.randint(0, len(lines)), "- " + rnd.choice(DONE))
@@ -60,4 +62,4 @@ for i in range(3):
     truth.append({"meeting": i + 1, "date": meet.isoformat(), "items": items})
 (in_dir / "notes.txt").write_text("\n\n".join(meetings), encoding="utf-8")
 (secret_dir / "truth.json").write_text(json.dumps({"seed": seed, "meetings": truth}, ensure_ascii=False, indent=1), encoding="utf-8")
-print("notes.txt 3개 회의, 할 일 15개 (유형은 숨김)")
+print(f"notes.txt 3개 회의, 할 일 {len(kinds)}개 (유형은 숨김)")
